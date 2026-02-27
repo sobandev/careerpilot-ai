@@ -1,0 +1,7 @@
+John Doe
+Software Engineer
+Experience: 5 years
+Skills: React, Python, PostgreSQL, Next.js, TypeScript
+Education: Bachelors in Computer Science
+Location: Remote
+I am a dedicated software engineer looking for a challenging role. I have extensive experience in full-stack web development and AI integration.
