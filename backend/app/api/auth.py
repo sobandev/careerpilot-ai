@@ -65,6 +65,8 @@ async def login(req: LoginRequest, response: Response):
         response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800)
 
         return {
+            "access_token": token,
+            "refresh_token": refresh_token,
             "user": {
                 "id": result.user.id,
                 "email": result.user.email,
