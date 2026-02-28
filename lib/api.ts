@@ -6,8 +6,18 @@ class APIService {
     private token: string | null = null;
     private refreshPromise: Promise<boolean> | null = null;
 
+    constructor() {
+        if (typeof window !== 'undefined') {
+            this.token = localStorage.getItem('cp_token');
+        }
+    }
+
     setToken(token: string | null) {
         this.token = token;
+        if (typeof window !== 'undefined') {
+            if (token) localStorage.setItem('cp_token', token);
+            else localStorage.removeItem('cp_token');
+        }
     }
 
     private async handleTokenRefresh(): Promise<boolean> {
