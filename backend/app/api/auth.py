@@ -61,8 +61,8 @@ async def login(req: LoginRequest, response: Response):
             }).execute()
 
         # Set HttpOnly cookies
-        response.set_cookie(key="access_token", value=token, httponly=True, secure=True, samesite="lax", max_age=3600)
-        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="lax", max_age=604800)
+        response.set_cookie(key="access_token", value=token, httponly=True, secure=True, samesite="none", max_age=3600)
+        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800)
 
         return {
             "user": {
@@ -86,8 +86,8 @@ async def logout(response: Response, token: str = Depends(get_token_from_request
         pass
             
     # Always clear cookies to ensure client is logged out locally
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    response.delete_cookie("access_token", httponly=True, secure=True, samesite="none")
+    response.delete_cookie("refresh_token", httponly=True, secure=True, samesite="none")
     
     return {"message": "Logged out successfully"}
 
