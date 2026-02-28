@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
-from app.core.supabase import get_supabase
+from app.core.supabase import get_supabase, get_supabase_service_role
 from app.core.config import settings
 from typing import Optional
 
@@ -14,7 +14,10 @@ async def verify_admin_access(request: Request):
     x_admin_key = request.headers.get("x-admin-key")
     if x_admin_key and getattr(settings, "ADMIN_SECRET_KEY", None):
         if x_admin_key == settings.ADMIN_SECRET_KEY:
-            return get_supabase() # Return raw client
+            try:
+                return get_supabase_service_role() # Return service client to bypass RLS
+            except ValueError as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
     # 2. Check JWT Token Auth
     authorization = request.headers.get("authorization")
@@ -37,7 +40,10 @@ async def verify_admin_access(request: Request):
     if not profile.data or profile.data[0].get("role") != "admin":
         raise HTTPException(status_code=403, detail="Forbidden. Admin access required.")
         
-    return sb
+    try:
+        return get_supabase_service_role() # Return service role for all authenticated admins
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats")

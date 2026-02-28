@@ -15,3 +15,8 @@ def get_supabase(token: str | None = None) -> Client:
     if _client is None:
         _client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
     return _client
+
+def get_supabase_service_role() -> Client:
+    if not getattr(settings, "SUPABASE_SERVICE_ROLE_KEY", None):
+        raise ValueError("SUPABASE_SERVICE_ROLE_KEY is not configured in the environment.")
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
