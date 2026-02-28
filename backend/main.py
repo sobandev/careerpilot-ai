@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import resume, jobs, applications, ai_routes, auth, profiles
+from app.api import resume, jobs, applications, ai_routes, auth, profiles, admin
 from app.core.config import settings
 
 app = FastAPI(
@@ -27,6 +27,7 @@ app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(applications.router, prefix="/api/applications", tags=["Applications"])
 app.include_router(ai_routes.router, prefix="/api/ai", tags=["AI"])
 app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 
 @app.get("/")

@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
     FRONTEND_URL: str = "http://localhost:3000"
+    ADMIN_SECRET_KEY: str | None = None
     GROQ_MODEL: str = "llama-3.1-8b-instant"
 
     class Config:
