@@ -251,6 +251,19 @@ class APIService {
     async getEmployerStats() {
         return this.request('/api/ai/employer/stats');
     }
+
+    // Admin Panel
+    async getAdminStats(secretKey?: string) {
+        const headers: Record<string, string> = {};
+        if (secretKey) headers['X-Admin-Key'] = secretKey;
+        return this.request<{ total_users: number, total_jobs: number, total_applications: number }>('/api/admin/stats', { headers });
+    }
+
+    async getAdminUsers(secretKey?: string) {
+        const headers: Record<string, string> = {};
+        if (secretKey) headers['X-Admin-Key'] = secretKey;
+        return this.request<Record<string, unknown>[]>('/api/admin/users', { headers });
+    }
 }
 
 export const api = new APIService();
