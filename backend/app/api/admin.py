@@ -1,27 +1,36 @@
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from app.core.supabase import get_supabase
-from app.core.dependencies import get_current_user
 from app.core.config import settings
 from typing import Optional
 
 router = APIRouter()
 
-async def verify_admin_access(
-    x_admin_key: Optional[str] = Header(None),
-    user_data: Optional[tuple] = Depends(get_current_user)
-):
+async def verify_admin_access(request: Request):
     """
     Validates if the requester is an Admin.
     Allows bypass if X-Admin-Key matches the server configuration.
     """
+    # 1. Check Secret Key bypass
+    x_admin_key = request.headers.get("x-admin-key")
     if x_admin_key and getattr(settings, "ADMIN_SECRET_KEY", None):
         if x_admin_key == settings.ADMIN_SECRET_KEY:
-            return get_supabase() # Return raw client for root queries
+            return get_supabase() # Return raw client
 
-    if not user_data:
+    # 2. Check JWT Token Auth
+    authorization = request.headers.get("authorization")
+    token = request.cookies.get("access_token")
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+
+    if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    user, sb = user_data
+    sb = get_supabase(token)
+    try:
+        user_resp = sb.auth.get_user(token)
+        user = user_resp.user
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
     
     # Check if the user's role is admin
     profile = sb.table("profiles").select("role").eq("id", user.id).execute()
