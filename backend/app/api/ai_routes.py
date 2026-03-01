@@ -137,11 +137,7 @@ Generate a personalized roadmap to help this candidate reach the target role."""
         "items": roadmap.get("items", []),
     }
 
-    existing_roadmap = sb.table("roadmaps").select("id").eq("user_id", user.id).execute()
-    if existing_roadmap.data:
-        sb.table("roadmaps").update(roadmap_data).eq("user_id", user.id).execute()
-    else:
-        sb.table("roadmaps").insert(roadmap_data).execute()
+    sb.table("roadmaps").insert(roadmap_data).execute()
 
     return roadmap
 
@@ -150,10 +146,21 @@ Generate a personalized roadmap to help this candidate reach the target role."""
 async def get_roadmap(user_data: tuple = Depends(get_current_user)):
     user, sb = user_data
 
-    result = sb.table("roadmaps").select("*").eq("user_id", user.id).execute()
+    result = sb.table("roadmaps").select("*").eq("user_id", user.id).order("created_at", desc=True).limit(1).execute()
     if not result.data:
-        raise HTTPException(status_code=404, detail="No roadmap generated yet")
+        # Check if they have an old one
+        old_result = sb.table("roadmaps").select("*").eq("user_id", user.id).execute()
+        if not old_result.data:
+            raise HTTPException(status_code=404, detail="No roadmap found.")
+        return old_result.data[0]
+        
     return result.data[0]
+
+@router.get("/roadmaps/history")
+async def get_roadmap_history(user_data: tuple = Depends(get_current_user)):
+    user, sb = user_data
+    result = sb.table("roadmaps").select("*").eq("user_id", user.id).order("created_at", desc=True).execute()
+    return {"history": result.data or []}
 
 
 class CompanyCreate(BaseModel):

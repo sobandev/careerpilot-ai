@@ -71,13 +71,8 @@ async def upload_resume(
         "embedding": embedding,  # Store full 384 dims for pgvector
     }
 
-    existing = sb.table("resumes").select("id").eq("user_id", user.id).execute()
-    if existing.data:
-        result = sb.table("resumes").update(resume_data).eq("user_id", user.id).execute()
-        resume_id = existing.data[0]["id"]
-    else:
-        result = sb.table("resumes").insert(resume_data).execute()
-        resume_id = result.data[0]["id"] if result.data else None
+    result = sb.table("resumes").insert(resume_data).execute()
+    resume_id = result.data[0]["id"] if result.data else None
 
     # Generate AI analysis via Groq
     in_demand = get_in_demand_skills(industry)
@@ -149,11 +144,7 @@ Analyze this resume and return the JSON."""
         "industry_alignment": analysis_json.get("industry_alignment", ""),
     }
 
-    existing_analysis = sb.table("resume_analysis").select("id").eq("user_id", user.id).execute()
-    if existing_analysis.data:
-        sb.table("resume_analysis").update(analysis_payload).eq("user_id", user.id).execute()
-    else:
-        sb.table("resume_analysis").insert(analysis_payload).execute()
+    sb.table("resume_analysis").insert(analysis_payload).execute()
 
     return {
         "resume_id": resume_id,
@@ -170,8 +161,8 @@ Analyze this resume and return the JSON."""
 async def get_analysis(user_data: tuple = Depends(get_current_user)):
     user, sb = user_data
 
-    resume = sb.table("resumes").select("*").eq("user_id", user.id).execute()
-    analysis = sb.table("resume_analysis").select("*").eq("user_id", user.id).execute()
+    resume = sb.table("resumes").select("*").eq("user_id", user.id).order("created_at", desc=True).limit(1).execute()
+    analysis = sb.table("resume_analysis").select("*").eq("user_id", user.id).order("created_at", desc=True).limit(1).execute()
 
     if not resume.data:
         raise HTTPException(status_code=404, detail="No resume found. Please upload your resume first.")
@@ -179,4 +170,16 @@ async def get_analysis(user_data: tuple = Depends(get_current_user)):
     return {
         "resume": resume.data[0] if resume.data else None,
         "analysis": analysis.data[0] if analysis.data else None,
+    }
+
+@router.get("/history")
+async def get_resume_history(user_data: tuple = Depends(get_current_user)):
+    user, sb = user_data
+
+    resumes = sb.table("resumes").select("id, created_at, file_url").eq("user_id", user.id).order("created_at", desc=True).execute()
+    analyses = sb.table("resume_analysis").select("id, resume_id, created_at, overall_score, industry_alignment").eq("user_id", user.id).order("created_at", desc=True).execute()
+
+    return {
+        "resumes": resumes.data or [],
+        "analyses": analyses.data or []
     }
