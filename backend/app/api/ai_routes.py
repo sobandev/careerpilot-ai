@@ -162,6 +162,16 @@ async def get_roadmap_history(user_data: tuple = Depends(get_current_user)):
     result = sb.table("roadmaps").select("*").eq("user_id", user.id).order("created_at", desc=True).execute()
     return {"history": result.data or []}
 
+@router.get("/roadmap/{roadmap_id}")
+async def get_roadmap_by_id(roadmap_id: str, user_data: tuple = Depends(get_current_user)):
+    user, sb = user_data
+    result = sb.table("roadmaps").select("*").eq("id", roadmap_id).eq("user_id", user.id).execute()
+    
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Roadmap not found or access denied.")
+        
+    return result.data[0]
+
 
 class CompanyCreate(BaseModel):
     name: str

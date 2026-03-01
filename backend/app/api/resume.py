@@ -183,3 +183,18 @@ async def get_resume_history(user_data: tuple = Depends(get_current_user)):
         "resumes": resumes.data or [],
         "analyses": analyses.data or []
     }
+
+@router.get("/analysis/{resume_id}")
+async def get_analysis_by_id(resume_id: str, user_data: tuple = Depends(get_current_user)):
+    user, sb = user_data
+
+    resume = sb.table("resumes").select("*").eq("id", resume_id).eq("user_id", user.id).execute()
+    analysis = sb.table("resume_analysis").select("*").eq("resume_id", resume_id).eq("user_id", user.id).execute()
+
+    if not resume.data:
+        raise HTTPException(status_code=404, detail="Resume/Analysis not found or access denied.")
+
+    return {
+        "resume": resume.data[0] if resume.data else None,
+        "analysis": analysis.data[0] if analysis.data else None,
+    }
