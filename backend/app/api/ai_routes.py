@@ -61,12 +61,19 @@ Return ONLY valid JSON in this exact structure:
       "skill": "Skill Name",
       "priority": 1,
       "timeline": "2 weeks",
-      "resources": ["Free resource 1", "Free resource 2"],
+      "resources": [
+        {
+          "title": "Resource Name",
+          "type": "video",
+          "cost": "free",
+          "url": "https://www.youtube.com/results?search_query=Resource+Name"
+        }
+      ],
       "milestone": "Build a small project using this skill"
     }
   ]
 }
-Include 5-7 skill items, ordered by priority. Focus on free resources (YouTube, documentation, freeCodeCamp, Coursera free tier, etc.)."""
+Include 5-7 skill items, ordered by priority. Focus on free resources (YouTube, documentation, freeCodeCamp, Coursera free tier, etc.). For the URL, do NOT guess actual links. You MUST construct a valid Google Search URL (https://www.google.com/search?q=Exact+Resource+Name) or YouTube Search URL (https://www.youtube.com/results?search_query=Exact+Resource+Name)."""
 
     user_prompt = f"""Candidate Profile:
 - Current Skills: {', '.join(resume.get('skills', [])[:15])}
@@ -107,7 +114,14 @@ Generate a personalized roadmap to help this candidate reach the target role."""
                     "skill": skill,
                     "priority": i + 1,
                     "timeline": "2-3 weeks",
-                    "resources": ["YouTube tutorials", "Official documentation", "freeCodeCamp"],
+                    "resources": [
+                        {
+                            "title": f"YouTube: Learn {skill} in 1 Hour",
+                            "type": "video",
+                            "cost": "free",
+                            "url": f"https://www.youtube.com/results?search_query=Learn+{skill}+in+1+Hour"
+                        }
+                    ],
                     "milestone": f"Complete a hands-on project using {skill}"
                 }
                 for i, skill in enumerate(missing)
