@@ -1,9 +1,11 @@
+import json
 from fastapi import APIRouter, Header, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from app.core.supabase import get_supabase
 from app.services.scorer import compute_compatibility_score
 from app.core.dependencies import get_current_user
+from app.core.groq_client import chat_completion
 
 router = APIRouter()
 
@@ -58,6 +60,29 @@ async def apply_to_job(req: ApplicationCreate, user_data: tuple = Depends(get_cu
             print(f"Scoring failed: {e}")
             match_score = 0
 
+    ai_feedback = []
+    if resume_res.data:
+        try:
+            prompt = f"""
+            You are an expert tech recruiter and career coach. Review this applicant's resume against the Job Description.
+            Return EXACTLY a JSON array of 3 concise, highly actionable sentences explaining how the applicant could improve their resume, cover letter, or interview strategy for THIS specific role.
+            Do not include any other text, markdown blocks, or conversational filler. Only the strict JSON array of 3 strings.
+
+            Job Requirements: {job.get('requirements', '')}
+            Job Description: {job.get('description', '')}
+            Applicant Resume Text: {resume.get('raw_text', '')}
+            """
+            content, _ = await chat_completion(
+                system_prompt="You are a strict JSON-producing Career Coach assistant.",
+                user_prompt=prompt,
+                max_tokens=300
+            )
+            parsed = json.loads(content)
+            if isinstance(parsed, list):
+                ai_feedback = parsed[:3]
+        except Exception as e:
+            print(f"Feedback generation failed: {e}")
+
     result = sb.table("applications").insert({
         "user_id": user.id,
         "job_id": req.job_id,
@@ -65,10 +90,15 @@ async def apply_to_job(req: ApplicationCreate, user_data: tuple = Depends(get_cu
         "contact_email": req.contact_email,
         "contact_phone": req.contact_phone,
         "status": "applied",
-        "match_score": match_score
+        "match_score": match_score,
+        "ai_feedback": ai_feedback
     }).execute()
 
-    return {"message": "Application submitted successfully", "id": result.data[0]["id"] if result.data else None}
+    return {
+        "message": "Application submitted successfully", 
+        "id": result.data[0]["id"] if result.data else None,
+        "ai_feedback": ai_feedback
+    }
 
 
 @router.get("")
