@@ -4,11 +4,7 @@ from typing import Optional, List, Literal
 from app.core.supabase import get_supabase
 from app.core.groq_client import chat_completion
 from app.core.dependencies import get_current_user
-import json
 import os
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import PydanticOutputParser
 from app.core.config import settings
 
 router = APIRouter()
@@ -73,13 +69,13 @@ async def generate_roadmap(req: RoadmapRequest, user_data: tuple = Depends(get_c
                 
             job_context_text += f"\nYour EXCLUSIVE mission is to build a roadmap that directly addresses these exact feedback points and prepares them for this specific role requirements: {job.get('requirements', '')}."
 
-    system_prompt = """You are a world-class career coach and tech educator. Generate a detailed, actionable career roadmap for this professional.
+    system_prompt = f"""You are a world-class career coach and tech educator. Generate a detailed, actionable career roadmap for this professional.
 IMPORTANT: Return strictly valid JSON conforming exactly to the requested schema. No markdown wrapping.
 You MUST provide high-quality, real-world resources (e.g. popular Udemy courses, exact YouTube tutorials, AWS/Microsoft Learn official docs).
 For URLs, construct highly targeted links if exact URLs cannot be verified. For video, use formatting like: https://www.youtube.com/results?search_query=Learn+React+Full+Course 
 For paid courses, refer to Coursera or Udemy direct searches.
 
-{format_instructions}
+Return ONLY a JSON object that strictly adheres to the schema representing {RoadmapSchema.__name__}.
 """
 
     user_prompt = f"""Candidate Profile:
@@ -92,21 +88,18 @@ For paid courses, refer to Coursera or Udemy direct searches.
 - Missing Skills Identified: {', '.join(analysis.get('missing_skills', [])[:8])}
 - Current Weaknesses: {', '.join(analysis.get('weaknesses', [])[:3])}{job_context_text}
 
-Generate a personalized 5-7 milestone roadmap to help this candidate reach the target role and overcome their weaknesses."""
+Generate a personalized 5-7 milestone roadmap to help this candidate reach the target role and overcome their weaknesses.
+FORMAT REQUEST: Return RAW JSON ONLY."""
 
     try:
-        # Initialize LangChain setup
-        llm = ChatGroq(api_key=settings.GROQ_API_KEY, model=settings.GROQ_MODEL, temperature=0.3)
-        parser = PydanticOutputParser(pydantic_object=RoadmapSchema)
+        # Use simple raw chat completion, but use Pydantic to strictly parse and dump the response
+        ai_response, usage = await chat_completion(system_prompt, user_prompt, max_tokens=2500)
         
-        prompt_template = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("user", user_prompt)
-        ])
+        start = ai_response.find("{")
+        end = ai_response.rfind("}") + 1
+        json_str = ai_response[start:end]
         
-        chain = prompt_template | llm | parser
-        
-        parsed_roadmap = await chain.ainvoke({"format_instructions": parser.get_format_instructions()})
+        parsed_roadmap = RoadmapSchema.model_validate_json(json_str)
         roadmap_dict = parsed_roadmap.model_dump()
         
         roadmap_data = {
@@ -119,14 +112,19 @@ Generate a personalized 5-7 milestone roadmap to help this candidate reach the t
 
         sb.table("roadmaps").insert(roadmap_data).execute()
         
-        # We don't have usage stats directly from chain.ainvoke easily without callbacks, 
-        # so we skip token tracking for LangChain calls or implement lightweight token counting later.
+        # Log Token Usage
+        sb.table("token_usage_logs").insert({
+            "user_id": user.id,
+            "endpoint": "/api/ai/roadmap",
+            "input_tokens": usage["prompt_tokens"],
+            "output_tokens": usage["completion_tokens"],
+            "total_tokens": usage["total_tokens"]
+        }).execute()
 
         return roadmap_dict
         
     except Exception as e:
-        print(f"Error generating roadmap: {e}")
-        # Fallback to empty state
+        print(f"Error generating roadmap dynamically: {e}")
         raise HTTPException(status_code=500, detail="Failed to synthesize roadmap dynamically.")
 
 
