@@ -99,6 +99,7 @@ export default function JobDetailPage() {
         setBuildingPlan(true);
         try {
             await api.generateRoadmap(undefined, id);
+            router.refresh();
             router.push('/dashboard/roadmap');
         } catch (err: unknown) {
             console.error(err);

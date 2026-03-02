@@ -64,21 +64,19 @@ class APIService {
 
         // With HttpOnly cookies, we remove explicit Authorization header 
         // and include credentials so the browser passes the cookies.
-        let response = await fetch(`${API_URL}${path}`, {
+        const fetchOptions: RequestInit = {
+            cache: 'no-store',
             ...options,
             headers,
             credentials: 'include',
-        });
+        };
+        let response = await fetch(`${API_URL}${path}`, fetchOptions);
 
         if (response.status === 401) {
             try {
                 const refreshed = await this.handleTokenRefresh();
                 if (refreshed) {
-                    response = await fetch(`${API_URL}${path}`, {
-                        ...options,
-                        headers,
-                        credentials: 'include',
-                    });
+                    response = await fetch(`${API_URL}${path}`, fetchOptions);
                 }
             } catch (err) {
                 throw new Error('Session expired');
