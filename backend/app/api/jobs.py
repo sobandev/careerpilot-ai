@@ -79,6 +79,7 @@ async def list_jobs(
                         job_industry=job.get("industry", ""),
                         job_description=job.get("description", ""),
                         resume_text=resume.get("raw_text", ""),
+                        job_title=job.get("title", ""),
                     )
                     job["match_score"] = score["total_score"]
                 jobs = rank_jobs(jobs, resume)
@@ -211,6 +212,7 @@ async def get_job(job_id: str, request: Request, authorization: str = Header(Non
                     job_industry=job.get("industry", ""),
                     job_description=job.get("description", ""),
                     resume_text=resume.get("raw_text", ""),
+                    job_title=job.get("title", ""),
                 )
                 job["compatibility"] = score
                 job["missing_skills"] = get_missing_skills(
@@ -251,6 +253,7 @@ async def get_job_score(job_id: str, user_data: tuple = Depends(get_current_user
         job_industry=job.get("industry", ""),
         job_description=job.get("description", ""),
         resume_text=resume.get("raw_text", ""),
+        job_title=job.get("title", ""),
     )
 
     missing = get_missing_skills(resume.get("skills", []), job.get("skills_required", []))

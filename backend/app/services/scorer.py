@@ -6,16 +6,33 @@ def _clamp(value: float, min_val: float = 0.0, max_val: float = 100.0) -> int:
     return int(max(min_val, min(max_val, value)))
 
 
-def compute_skill_match(user_skills: List[str], job_skills: List[str]) -> int:
-    """Calculate skill match percentage."""
+def compute_skill_match(user_skills: List[str], job_skills: List[str], job_title: str = "") -> int:
+    """Calculate skill match percentage with contextual role-weighting."""
     if not job_skills:
         return 50
     if not user_skills:
         return 0
+        
     user_set = {s.lower().strip() for s in user_skills}
     job_set = {s.lower().strip() for s in job_skills}
-    matched = len(user_set & job_set)
-    return _clamp((matched / len(job_set)) * 100)
+    
+    job_title_lower = job_title.lower() if job_title else ""
+    
+    total_weight = 0
+    matched_weight = 0
+    
+    for skill in job_set:
+        # Contextual Weighting: If the skill is literally in the job title, it's a critical core skill (e.g. "React" in "Senior React Engineer"). Assign 3x weight
+        weight = 3 if skill in job_title_lower else 1
+        total_weight += weight
+        
+        if skill in user_set:
+            matched_weight += weight
+            
+    if total_weight == 0:
+        return 0
+        
+    return _clamp((matched_weight / total_weight) * 100)
 
 
 def compute_experience_match(user_years: float, job_min: float, job_max: float) -> int:
@@ -35,17 +52,27 @@ def compute_experience_match(user_years: float, job_min: float, job_max: float) 
 
 def compute_keyword_similarity(resume_text: str, job_description: str,
                                 resume_emb: List[float], job_emb: List[float]) -> int:
-    """Calculate keyword similarity using embeddings."""
-    if resume_emb and job_emb and any(v != 0 for v in resume_emb):
-        sim = compute_cosine_similarity(resume_emb, job_emb)
-        return _clamp(sim * 100)
-    # Fallback: word overlap
+    """Calculate keyword similarity using dense (embeddings) and sparse (TF-IDF/BM25 approx) hybrid search."""
+    dense_score = 0
+    sparse_score = 0
+    
+    # 1. Sparse Search (Exact Keyword / BM25 Approximation)
     resume_words = set(resume_text.lower().split())
     job_words = set(job_description.lower().split())
-    if not job_words:
-        return 0
-    overlap = len(resume_words & job_words) / len(job_words)
-    return _clamp(overlap * 130)  # Scale up slightly
+    if job_words:
+        overlap = len(resume_words & job_words) / len(job_words)
+        sparse_score = _clamp(overlap * 130) # Scale up slightly
+        
+    # 2. Dense Search (AI Semantic Embeddings via Cosine Similarity)
+    if resume_emb and job_emb and any(v != 0 for v in resume_emb):
+        sim = compute_cosine_similarity(resume_emb, job_emb)
+        dense_score = _clamp(sim * 100)
+        
+    # Hybrid Fusion: 70% Semantic Meaning + 30% Exact Terminology
+    if dense_score > 0:
+        return _clamp(dense_score * 0.70 + sparse_score * 0.30)
+    else:
+        return sparse_score
 
 
 def compute_education_match(user_edu: str, job_edu: str) -> int:
@@ -89,12 +116,13 @@ def compute_compatibility_score(
     job_description: str,
     resume_text: str,
     job_embedding: List[float] = None,
+    job_title: str = "",
 ) -> Dict[str, int]:
     """
     Compute weighted compatibility score.
-    Weights: Skill 40%, Experience 25%, Keywords 20%, Education 10%, Industry 5%
+    Weights: Contextual Skill 40%, Experience 25%, Hybrid Keywords 20%, Education 10%, Industry 5%
     """
-    skill = compute_skill_match(user_skills, job_skills)
+    skill = compute_skill_match(user_skills, job_skills, job_title)
     experience = compute_experience_match(user_experience_years, job_experience_min, job_experience_max)
     keyword = compute_keyword_similarity(resume_text, job_description, resume_embedding, job_embedding or [])
     education = compute_education_match(user_education, job_education)
